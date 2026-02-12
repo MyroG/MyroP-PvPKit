@@ -3,7 +3,6 @@
 using System;
 using UdonSharp;
 using UnityEngine;
-using UnityEngine.Jobs;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -21,6 +20,15 @@ namespace myrop.pvp
 		public GunBase Gun;
 		public PlayerColliderAttacher PlayerColliderAttacherReference;
 
+		public MeshRenderer CapsuleRenderer;
+		public Material ImmunityMaterial;
+		public Material NormalMaterial;
+		public MeshRenderer Healthbar;
+
+		[Header("Audio")]
+		public AudioManager LocalAudioManager;
+		public AudioClip LocalPlayerGotHit;
+
 		[UdonSynced]
 		private float _health;
 
@@ -30,11 +38,20 @@ namespace myrop.pvp
 		[UdonSynced]
 		private int _deathCounter;
 
+		[UdonSynced]
+		private bool _isImmunity;
+
 		private Scoreboard _scoreboard;
 		private int _playerID;
+		private bool _isOwner;
+
+		private const float IMMUNITY_TIME = 3.0f;
+
+		
 
 		private void Start()
 		{
+			_isOwner = Networking.IsOwner(gameObject);
 			_playerID = Networking.GetOwner(gameObject).playerId;
 			Gun.gameObject.SetActive(false);
 			PlayerColliderAttacherReference.gameObject.SetActive(false);
@@ -48,23 +65,23 @@ namespace myrop.pvp
 			}
 			return _scoreboard;
 		}
-		public override void OnDeserialization()
-		{
-			Scoreboard scoreboard = GetScoreboard();
-			if (scoreboard == null )
-				return;
-			scoreboard.UpdateInScoreboard(_playerID, _killCounter, _deathCounter, _killCounter - (short)(_deathCounter / 2.0f));
-		}
 
 		public void _StartGame()
 		{
 			PlayerColliderAttacherReference.gameObject.SetActive(true);
+			CapsuleRenderer.gameObject.SetActive(PvPGameManagerReference.ShowPlayerCapsule && !_isOwner);
+			
+			if (Gun != null)
+				Gun.gameObject.SetActive(true);
+			
+			if (!_isOwner)
+				return;
+
 			ResetHealth();
 			_deathCounter = 0;
-			//Since the gun gets placed in front of the player collider, we need to make sure that the collider gets attached to the player first before we spawn the gun
-			//So delaying the event by one or two frames should be good enough
+			
 			_PlaceGun();
-
+			TriggerCooldown();
 			RequestSerialization();
 			OnDeserialization();
 		}
@@ -74,9 +91,13 @@ namespace myrop.pvp
 		/// </summary>
 		private void _PlaceGun()
 		{
+			//Since the gun gets placed in front of the player collider, we need to make sure that the collider gets attached to the player first before we spawn the gun
+			//So delaying the event by a few frames should be good enough (Another way would be to manually move those colliders also, but I don't want to create
+			//too many dependencies
+
 			//The reason we do it twice, is because VRCObjectsSync is weird, moving a VRCObjectSynced object doesn't always work...
-			SendCustomEventDelayedFrames(nameof(_PlaceGunOnce), 2);
-			SendCustomEventDelayedFrames(nameof(_PlaceGunOnce), 2);
+			SendCustomEventDelayedFrames(nameof(_PlaceGunOnce), 3);
+			SendCustomEventDelayedFrames(nameof(_PlaceGunOnce), 3);
 		}
 
 		/// <summary>
@@ -86,8 +107,6 @@ namespace myrop.pvp
 		public void _PlaceGunOnce()
 		{
 			if (Gun == null) return;
-
-			Gun.gameObject.SetActive(true);
 
 			if (!Networking.IsOwner(Gun.gameObject))
 				return;
@@ -103,6 +122,8 @@ namespace myrop.pvp
 
 		public void _FinishGame()
 		{
+			PlayerColliderAttacherReference.gameObject.SetActive(false);
+
 			if (Gun == null) return;
 
 			Gun.gameObject.SetActive(false);
@@ -117,9 +138,12 @@ namespace myrop.pvp
 		[NetworkCallable]
 		public void ReceiveDamage(float damageReceived, int fromPlayerID)
 		{
-			PvPUtils.Log($"ReceiveDamage {damageReceived} from player ID {fromPlayerID}, IsOwner is {Networking.IsOwner(gameObject)}");
+			PvPUtils.Log($"ReceiveDamage {damageReceived} from player ID {fromPlayerID}, IsOwner is {Networking.IsOwner(gameObject)}, immunity {_isImmunity}");
 
-			if (!Networking.IsOwner(gameObject))
+			if (!_isOwner)
+				return;
+
+			if (_isImmunity) 
 				return;
 
 			_health -= damageReceived;
@@ -138,6 +162,30 @@ namespace myrop.pvp
 				_deathCounter++;
 			}
 
+			//audio
+			LocalAudioManager.PlayAudio(LocalPlayerGotHit, transform.position, ShotImportance.LocalPlayer, 0.7f);
+
+			RequestSerialization();
+			OnDeserialization();
+		}
+
+		private void TriggerCooldown()
+		{
+			if (_isImmunity)
+				return;
+
+			_isImmunity = true;
+
+			SendCustomEventDelayedSeconds(nameof(_DisableCooldown), IMMUNITY_TIME);
+
+			RequestSerialization();
+			OnDeserialization();
+		}
+
+		public void _DisableCooldown()
+		{
+			_isImmunity = false;
+
 			RequestSerialization();
 			OnDeserialization();
 		}
@@ -146,7 +194,8 @@ namespace myrop.pvp
 		{
 			PvPGameManagerReference._TeleportLocalPlayerToRandom();
 			_PlaceGun();
-			ResetHealth();			
+			ResetHealth();
+			TriggerCooldown();
 		}
 
 		/// <summary>
@@ -157,9 +206,9 @@ namespace myrop.pvp
 		[NetworkCallable]
 		public void KilledPlayer(int playerKilled)
 		{
-			PvPUtils.Log($"local player {Networking.LocalPlayer.playerId} killed player ID {playerKilled}, IsOwner={Networking.IsOwner(gameObject)}, _killCounter={_killCounter}");
+			PvPUtils.Log($"local player {Networking.LocalPlayer.playerId} killed player ID {playerKilled}, IsOwner={_isOwner}, _killCounter={_killCounter}");
 
-			if (!Networking.IsOwner(gameObject))
+			if (!_isOwner)
 				return;
 
 			if (playerKilled == Networking.LocalPlayer.playerId)
@@ -169,6 +218,18 @@ namespace myrop.pvp
 
 			RequestSerialization();
 			OnDeserialization();
+		}
+
+		public override void OnDeserialization()
+		{
+			Scoreboard scoreboard = GetScoreboard();
+			if (scoreboard == null)
+				return;
+			scoreboard.UpdateInScoreboard(_playerID, _killCounter, _deathCounter, _killCounter - (short)(_deathCounter / 2.0f));
+
+			CapsuleRenderer.material = _isImmunity ? ImmunityMaterial : NormalMaterial;
+
+			Healthbar.material.SetFloat("_Health", _health / 100.0f);
 		}
 	}
 }

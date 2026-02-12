@@ -427,7 +427,7 @@ MonoBehaviour:
   - {fileID: 5092282100131379227}
   - {fileID: 3809855841705122057}
   MaxRenderDistanceCrosshair: 100
-  CrosshairSizeOnScreen: 0.04
+  CrosshairSizeOnScreen: 0.02
 --- !u!114 &1703282741249642913
 MonoBehaviour:
   m_ObjectHideFlags: 0

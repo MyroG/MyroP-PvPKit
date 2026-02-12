@@ -12,6 +12,7 @@ namespace myrop.pvp
 	{
 		public CapsuleCollider BodyCollider;
 		public SphereCollider HeadCollider;
+		public GameObject Capsule;
 
 		public PlayerHandlerBase PlayerHandlerInstance;
 		private VRCPlayerApi _player;
@@ -61,6 +62,12 @@ namespace myrop.pvp
 				HeadCollider.center.z
 			);
 			HeadCollider.radius = headRadius;
+
+			Capsule.transform.localScale = new Vector3(
+				.5f * avatarSize * 0.4f,
+				.5f * avatarSize,
+				.5f * avatarSize * 0.4f
+			);
 		}
 
 		public override void PostLateUpdate()
@@ -69,7 +76,6 @@ namespace myrop.pvp
 				return;
 
 			transform.position = _player.GetPosition();
-			transform.rotation = _player.GetRotation();
 		}
 	}
 }

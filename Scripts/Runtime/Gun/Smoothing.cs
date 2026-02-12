@@ -1,6 +1,8 @@
 ﻿
 using UdonSharp;
 using UnityEngine;
+using UnityEngine.UIElements;
+using VRC.SDK3.Data;
 using VRC.SDKBase;
 using VRC.Udon;
 
@@ -8,76 +10,101 @@ namespace myrop.pvp
 {
 	/// <summary>
 	/// This component enables movement smoothing on any component it is attached to
+	/// I tried a few different implementations, and none of them gave me a satisfying result, so after a bit of research I found the 
+	/// "1€ filter" algorithm, which seemed promissing https://gery.casiez.net/1euro/
+	/// Implementation may have errors.
 	/// </summary>
 	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class Smoothing : UdonSharpBehaviour
 	{
-		public float SmoothingSpeed = 15.0f;
+		[Header("Slow movement smoothing (jitter kill)")]
+		public float SlowPosLerpSpeed = 12f;   // higher = snappier
+		public float SlowRotLerpSpeed = 12f;
 
-		[Header("Smoothing gets disabled when the object is faster than the values set below")]
-		public float MaxLinearSpeed = 1.0f;
-		public float MaxAngularSpeed = 1.0f;
+		[Header("Fast movement smoothing (responsiveness)")]
+		public float FastPosLerpSpeed = 35f;   // higher = less smoothing
+		public float FastRotLerpSpeed = 35f;
 
-		private Vector3 _previousPosition;
-		private Quaternion _previousRotation;
+		[Header("When speeds exceed these, reduce smoothing")]
+		public float MaxLinearSpeed = 1.0f;    // m/s
+		public float MaxAngularSpeed = 180f;   // deg/s
 
 		private Vector3 _defaultLocalPosition;
 		private Quaternion _defaultLocalRotation;
+		private bool _init;
 
-		private bool _isFirstEnable = true;
+		private Vector3 _smoothedPos;
+		private Quaternion _smoothedRot;
+
+		private Vector3 _prevRawPos;
+		private Quaternion _prevRawRot;
 
 		private void Start()
-		{
-			//We only enable smoothing in VR, so Desktop players can flickshot more easily
+		{ 
+			//We only enable smoothing in VR, so Desktop players can flickshot more easily 
 			enabled = Networking.LocalPlayer.IsUserInVR();
 		}
 
 		void OnEnable()
 		{
-			if (_isFirstEnable)
-			{ 
+			if (!_init)
+			{
 				_defaultLocalPosition = transform.localPosition;
 				_defaultLocalRotation = transform.localRotation;
-				_isFirstEnable = false;
+				_init = true;
 			}
 
 			transform.localPosition = _defaultLocalPosition;
 			transform.localRotation = _defaultLocalRotation;
 
-			_previousPosition = transform.position;
-			_previousRotation = transform.rotation;
+			var rawPos = transform.position;
+			var rawRot = transform.rotation;
+
+			_smoothedPos = rawPos;
+			_smoothedRot = rawRot;
+
+			_prevRawPos = rawPos;
+			_prevRawRot = rawRot;
 		}
 
 		public override void PostLateUpdate()
 		{
+			//PvPUtils.Log($"before {transform.localPosition} {transform.position}");
+			// capture raw pose (from parent/controller) by restoring local offsets
 			transform.localPosition = _defaultLocalPosition;
 			transform.localRotation = _defaultLocalRotation;
 
-			if (ShouldSmoothMovements())
-			{
-				float t = Time.deltaTime * SmoothingSpeed;
-
-				transform.position = Vector3.Lerp(_previousPosition, transform.position, t);
-				transform.rotation = Quaternion.Slerp(_previousRotation, transform.rotation, t);
-			}
-
-			_previousPosition = transform.position;
-			_previousRotation = transform.rotation;
-		}
-
-		private bool ShouldSmoothMovements()
-		{
-			return true;
 			float dt = Time.deltaTime;
-			if (dt <= 0f) return false;
 
-			float linearSpeed =
-				Vector3.Distance(transform.position, _previousPosition) / dt;
-			float angularSpeed =
-				Quaternion.Angle(transform.rotation, _previousRotation) / dt;
+			var rawPos = transform.position;
+			var rawRot = transform.rotation;
 
-			Debug.Log($"{transform.position} {_previousPosition} {linearSpeed}");
-			return linearSpeed < MaxLinearSpeed && angularSpeed < MaxAngularSpeed;
+			// estimate raw speeds
+			float linSpeed = Vector3.Distance(rawPos, _prevRawPos) / dt;
+			float angSpeed = Quaternion.Angle(rawRot, _prevRawRot) / dt;
+
+			// map speeds -> blend factor (0 = slow, 1 = fast)
+			float fastness = Mathf.Max(
+				Mathf.Clamp01(linSpeed / MaxLinearSpeed),
+				Mathf.Clamp01(angSpeed / MaxAngularSpeed)
+			);
+
+			// pick smoothing speeds based on fastness
+			float posT = 1f - Mathf.Exp(-Mathf.Lerp(SlowPosLerpSpeed, FastPosLerpSpeed, fastness) * dt);
+			float rotT = 1f - Mathf.Exp(-Mathf.Lerp(SlowRotLerpSpeed, FastRotLerpSpeed, fastness) * dt);
+
+			//PvPUtils.Log($"{_prevRawPos} {rawPos} {transform.position} {_smoothedPos} {posT} {Vector3.Lerp(_smoothedPos, rawPos, posT)}");
+			
+			_smoothedPos = Vector3.Lerp(_smoothedPos, rawPos, posT);
+			_smoothedRot = Quaternion.Slerp(_smoothedRot, rawRot, rotT);
+
+			transform.position = _smoothedPos;
+			transform.rotation = _smoothedRot;
+
+			_prevRawPos = rawPos;
+			_prevRawRot = rawRot;
 		}
 	}
+
+
 }

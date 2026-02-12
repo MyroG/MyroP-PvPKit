@@ -9,6 +9,7 @@ using VRC.SDK3.Data;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon;
+using VRC.Udon.Common;
 using static UnityEngine.UI.CanvasScaler;
 
 namespace myrop.pvp
@@ -22,11 +23,14 @@ namespace myrop.pvp
 
 		public int RoundLengthInSeconds;
 
+		public bool ShowPlayerCapsule = true;
+
 		[UdonSynced]
 		private double _startNetworkingTime;
 
 		[UdonSynced]
 		private bool _isGameStarted;
+		private bool _clearPlayerListNext;
 		private bool _gameStartedSaved;
 
 		[UdonSynced]
@@ -48,11 +52,18 @@ namespace myrop.pvp
 		private DataDictionary/*<int, PlayerHandlerBase>*/ _playerObjects;
 
 		private Scoreboard _scoreboardInstance;
+		private PlayerScaleEnforcer _playerScaleEnforcerInstance;
 
 		void Start()
 		{
 			_localPlayerObject = PvPUtils.FindPlayerHandlerOf(Networking.LocalPlayer);
 			_joinedPlayers = new short[0];
+		}
+
+
+		public void SetPlayerScaleEnforcerInstance(PlayerScaleEnforcer playerScaleEnforcer)
+		{
+			_playerScaleEnforcerInstance = playerScaleEnforcer;
 		}
 
 		public void SetScoreboardInstance(Scoreboard scoreboardInstance)
@@ -135,6 +146,7 @@ namespace myrop.pvp
 				return;
 			
 			_isGameStarted = false;
+			_clearPlayerListNext = true;
 
 			RequestSerialization();
 			OnDeserialization();
@@ -174,6 +186,10 @@ namespace myrop.pvp
 				if (player.isLocal)
 				{
 					player.TeleportTo(SpawnPoints[i].position, SpawnPoints[i].rotation);
+					if (_playerScaleEnforcerInstance != null)
+					{
+						_playerScaleEnforcerInstance._ApplyLocalPlayerScale();
+					}
 				}
 			}
 		}
@@ -215,13 +231,29 @@ namespace myrop.pvp
 				if (player.isLocal)
 				{
 					player.TeleportTo(RespawnPoint.position, RespawnPoint.rotation);
+					if (_playerScaleEnforcerInstance != null)
+					{
+						_playerScaleEnforcerInstance._RevertAvatarScale();
+					}
 				}
 			}
+		}
 
-			if (!Networking.IsOwner(gameObject))
+		public override void OnPostSerialization(SerializationResult result)
+		{
+			if (!_clearPlayerListNext)
 				return;
+			PvPUtils.Log($"Clearing player list...");
 
+			//We need to :
+			//- First sync _isGameStarted = false;
+			//- Then sync  _joinedPlayers = []
+			//Otherwise, remote players will get _isGameStarted = false and  _joinedPlayers = [] at the same time, meaning that their game won't reset
+			//Since they are already removed from the joined player list
+			//I am setting _joinedPlayers = new short[0]; in OnPostSerialization to ensure it gets synced at a separate networking tick
+			_clearPlayerListNext = false;
 			_joinedPlayers = new short[0];
+
 			RequestSerialization();
 			OnDeserialization();
 		}
@@ -274,7 +306,7 @@ namespace myrop.pvp
 		{
 			PvPUtils.Log($"Player {playerId} requested to leave");
 
-			if (!Networking.IsOwner(gameObject))
+			if (!Networking.IsOwner(gameObject) || _isGameStarted)
 				return;
 
 			RemovePlayer(playerId);
@@ -363,10 +395,7 @@ namespace myrop.pvp
             {
 				PvPUtils.Log($"End reached, resetting the game");
 
-				_isGameStarted = false;
-
-				RequestSerialization();
-				OnDeserialization();
+				OnResetGameClicked();
 			}
         }
 
@@ -375,6 +404,9 @@ namespace myrop.pvp
 			return _isGameStarted;
 		}
 
-		
+		public bool IsGameStartedAndLocalPlayerIngame()
+		{
+			return IsGameStarted() && IsLocalPlayerJoined();
+		}
 	}
 }

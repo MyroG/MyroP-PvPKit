@@ -59,7 +59,7 @@ Transform:
   m_GameObject: {fileID: 3371034403252694245}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.000000014901161, z: -0, w: 1}
-  m_LocalPosition: {x: 0.0004, y: 0, z: 0.44}
+  m_LocalPosition: {x: 0.0026, y: 0.088, z: -0.6026}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -99,7 +99,10 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   _udonSharpBackingUdonBehaviour: {fileID: 5520021873760331760}
-  SmoothingSpeed: 10
+  SlowPosLerpSpeed: 12
+  SlowRotLerpSpeed: 12
+  FastPosLerpSpeed: 35
+  FastRotLerpSpeed: 35
   MaxLinearSpeed: 3
   MaxAngularSpeed: 100
 --- !u!114 &5520021873760331760
@@ -274,8 +277,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MomentumTransferMethod: 0
   DisallowTheft: 1
-  ExactGun: {fileID: 2268038557162276942}
-  ExactGrip: {fileID: 0}
+  ExactGun: {fileID: 3450343057337977878}
+  ExactGrip: {fileID: 2268038557162276942}
   allowManipulationWhenEquipped: 0
   orientation: 1
   AutoHold: 3
@@ -363,6 +366,7 @@ MonoBehaviour:
   GunMesh: {fileID: 0}
   GunblowbackOrigin: {fileID: 3450343057337977878}
   GunblowbackMax: {fileID: 4047810928067357832}
+  Crosshair: 1
   Barrel: {fileID: 3525569113571673178}
   ImpactDebugReference: {fileID: 0}
 --- !u!114 &2862419393334565806

@@ -49,6 +49,7 @@ namespace myrop.pvp
 		private float _currentAngleSpread = 0.0f;
 		private float _currentRecoveryCoefficient = 0.0f;
 
+		[Header("Recoil animation")]
 		public Transform GunMesh;
 		public Transform GunblowbackOrigin;
 		public Transform GunblowbackMax;
@@ -56,6 +57,12 @@ namespace myrop.pvp
 		public ECrosshair Crosshair = ECrosshair.DesktopVR;
 
 		public Transform Barrel;
+
+		[Header("Audio")]
+		public AudioManager LocalAudioManager;
+		public AudioClip ShotClose;
+		public AudioClip ShotFar;
+		public AudioClip PlayerHit;
 
 		private bool _isTriggerPressed;
 		private bool _isWaitingForNextBullet; //After a bullet was shot, we need to wait until the next bullet can be shot
@@ -68,6 +75,15 @@ namespace myrop.pvp
 
 		public ImpactDebug ImpactDebugReference;
 
+		private void Start()
+		{
+			if (Networking.LocalPlayer.IsUserInVR())
+			{
+				PickupReference.orientation = VRC_Pickup.PickupOrientation.Any;
+				PickupReference.ExactGrip = null;
+				PickupReference.ExactGun = null;
+			}
+		}
 		public override void OnPickup()
 		{
 			_isTriggerPressed = false;
@@ -197,6 +213,10 @@ namespace myrop.pvp
 					//damage
 					float damage = Damage * hitDetector.DamageMultiplicator;
 					hitDetector.PlayerHandler.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PlayerHandlerBase.ReceiveDamage), damage, Networking.LocalPlayer.playerId);
+
+					//hit
+					//We slightly delay the event to ensure it doesn't play at the same time as the gunshot, it would sound weird
+					SendCustomEventDelayedSeconds(nameof(_LocalPlayerHitEnemy), 0.05f);
 				}
 				else
 				{
@@ -207,7 +227,18 @@ namespace myrop.pvp
 			//accuracy
 			_currentAngleSpread += SpreadLossPerShot;
 			_currentAngleSpread = Mathf.Clamp(_currentAngleSpread, _minSpreadDeg, _maxSpreadDeg);
+
+			//audio
+			LocalAudioManager.PlayAudio(ShotClose, transform.position, ShotImportance.LocalPlayer, 0.7f);
 		}
+
+		public void _LocalPlayerHitEnemy()
+		{
+
+			LocalAudioManager.PlayAudio(PlayerHit, transform.position, ShotImportance.LocalPlayer);
+
+		}
+
 
 		public void _CustomLoop()
 		{
