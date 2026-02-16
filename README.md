@@ -135,13 +135,15 @@ Gun assets, textures, and audio files are licensed under CC0.
 
 ## Important note
 This asset is still in beta, and there are more features I wanted to add later on.
-I also started working on an API to ensure world creators can customize the PvP system without needing to modify the base assets, but it is not ready yet. In the meantime, if you need to modify the prefab, feel free suggesting features by opening a new ticket, or by creating a Pull request.
+I also started working on an API to ensure world creators can customize the PvP system without needing to modify the base assets, but it is not ready yet.
+
+In the meantime, if you need to modify the prefab, feel free suggesting features by opening a new ticket. You can also create PR, but it is not guaranteed that I will accept every pull request
 
 Planned features, or features I am interested to implement :
 - Sniper riffle
 - Possibility to switch guns
 - Two handed weapons
-- Possibility to grab ammo
+- Possibility to grab ammo from ammo crates.
 
 
 
