@@ -173,7 +173,7 @@ namespace myrop.pvp
 
 		public override void OnDeserialization()
 		{
-			Debug();
+			// Debug();
 			foreach (var scoreboard in Scoreboards)
 			{
 				scoreboard.UpdateScoreboard(_serializedScoreboard);

@@ -3,6 +3,7 @@ using myrop.pvp;
 using System;
 using System.Linq;
 using System.Reflection;
+using TMPro;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.Data;
@@ -24,6 +25,9 @@ namespace myrop.pvp
 		public int RoundLengthInSeconds;
 
 		public bool ShowPlayerCapsule = true;
+
+		[UdonSynced] 
+		public bool LockedByOwner = true;
 
 		[UdonSynced]
 		private double _startNetworkingTime;
@@ -129,8 +133,14 @@ namespace myrop.pvp
 				return; //in case the reset button is pressed during the start delay
 			}
 
+			if (_joinedPlayers.Length == 0)
+			{
+				PvPUtils.LogWarning($"0 players, we do nothing");
+				return;
+			}
+
 			if (!Networking.IsOwner(gameObject))
-				Networking.SetOwner(Networking.LocalPlayer, gameObject);
+				return;  //Only the owner can start
 
 			_startNetworkingTime = Networking.GetServerTimeInSeconds() + START_TIME_DELAY;
 			_isGameStarted = true;
@@ -143,8 +153,8 @@ namespace myrop.pvp
 		public void OnResetGameClicked()
 		{
 			if (!Networking.IsOwner(gameObject))
-				return;
-			
+				return;   //I think it makes sense if only the owner can reset the game
+
 			_isGameStarted = false;
 			_clearPlayerListNext = true;
 
@@ -258,6 +268,11 @@ namespace myrop.pvp
 			OnDeserialization();
 		}
 
+		public override void OnOwnershipTransferred(VRCPlayerApi player)
+		{
+			MainUIPanelReference._RefreshUI();
+		}
+
 		public override void OnDeserialization()
 		{
 			MainUIPanelReference._RefreshUI();
@@ -282,7 +297,7 @@ namespace myrop.pvp
 			}
 		}
 
-		[NetworkCallable(maxEventsPerSecond: 1)]
+		[NetworkCallable(maxEventsPerSecond: 5)]
 		public void PlayerRequestedToJoin(int playerId)
 		{
 			PvPUtils.Log($"Player {playerId} requested to join");
@@ -290,9 +305,7 @@ namespace myrop.pvp
 			if (!Networking.IsOwner(gameObject) || _isGameStarted)
 				return;
 
-			DataList keys = _playerObjects.GetKeys();
-
-			if (keys.Count >= SpawnPoints.Length)
+			if (_joinedPlayers.Length >= SpawnPoints.Length)
 			{
 				PvPUtils.LogError($"Player {playerId} couldn't join : Too many registed players ({SpawnPoints.Length})");
 				return;
@@ -407,6 +420,19 @@ namespace myrop.pvp
 		public bool IsGameStartedAndLocalPlayerIngame()
 		{
 			return IsGameStarted() && IsLocalPlayerJoined();
+		}
+
+		public void _ToggleLocked()
+		{
+			if (!Networking.IsOwner(gameObject))
+			{
+				return;
+			}
+
+			LockedByOwner = !LockedByOwner;
+
+			RequestSerialization();
+			OnDeserialization();
 		}
 	}
 }

@@ -15,8 +15,6 @@ namespace myrop.pvp
 	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class UiScoreboard : UdonSharpBehaviour
 	{
-		public int NumberRowsMax;
-
 		public UiScoreboardRow[] Rows;
 
 		void Start()
@@ -29,21 +27,43 @@ namespace myrop.pvp
 
 		public void UpdateScoreboard(short[] serializedScoreboard)
 		{
-			for (int serializedScoreboardIndex = 0 , rowIndex = 0; serializedScoreboardIndex < serializedScoreboard.Length; serializedScoreboardIndex += 4, rowIndex++)
+			for (int rowIndex = 0; rowIndex < Rows.Length; rowIndex++)
+			{
+				int serializedScoreboardIndex = rowIndex * 4;
+
+				if (serializedScoreboardIndex + 4 <= serializedScoreboard.Length)
+				{
+					short[] serializedScoreboardRow = new short[4];
+					Array.Copy(serializedScoreboard, serializedScoreboardIndex, serializedScoreboardRow, 0, 4);
+
+					Rows[rowIndex].gameObject.SetActive(true);
+					Rows[rowIndex].SetScore(serializedScoreboardRow);
+				}
+				else
+				{
+					Rows[rowIndex].gameObject.SetActive(false);
+				}
+			}
+
+
+
+			/*for (int serializedScoreboardIndex = 0 , rowIndex = 0; serializedScoreboardIndex < serializedScoreboard.Length; serializedScoreboardIndex += 4, rowIndex++)
 			{
 				short[] serializedScoreboardRow = new short[4];
 				Array.Copy(serializedScoreboard, serializedScoreboardIndex, serializedScoreboardRow, 0, 4);
 
-				if (rowIndex >= NumberRowsMax)
-				{
-					Rows[rowIndex].gameObject.SetActive(false);
-				}
+				
 				else
 				{
 					Rows[rowIndex].gameObject.SetActive(true);
 					Rows[rowIndex].SetScore(serializedScoreboardRow);
 				}
 			}
+
+			if (rowIndex >= NumberRowsMax)
+			{
+				Rows[rowIndex].gameObject.SetActive(false);
+			}*/
 			/*int indexSerializedScoreboard = 0;
 			for (int rowIndex = 0; rowIndex < Rows.Length; rowIndex++)
 			{

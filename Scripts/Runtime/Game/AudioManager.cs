@@ -7,7 +7,6 @@ using VRC.SDKBase;
 
 namespace myrop.pvp
 {
-	public enum ShotImportance { LocalPlayer = 1, Other = 4}
 
 	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class AudioManager : UdonSharpBehaviour
@@ -21,12 +20,11 @@ namespace myrop.pvp
 		private AudioSource[] _pool;
 
 		[Header("Distance Rules (meters)")]
-		public float nearDist = 25f;
-		public float midDist = 60f;
-		public float maxAudibleDist = 120f;
+		public float MidDist = 60f;
+		public float MaxAudibleDist = 120f;
 
 		[Header("Per-shooter Throttle")]
-		public float minIntervalPerShooter = 0.07f;
+		public float MinIntervalPerShooter = 0.07f;
 		private float _timeLastAudioSourcePlayed;
 
 		private VRCPlayerApi _localPlayer;
@@ -88,37 +86,48 @@ namespace myrop.pvp
 			SendCustomEventDelayedSeconds(nameof(_CustomLoop), 0.05f);
 		}
 
-		public void PlayAudio(AudioClip clip, Vector3 pos, ShotImportance importance, float volume = 1f, float pitchJitter = 0.0f)
+		public void PlayAudio(AudioClip clip, Vector3 pos, int importance, float volume = 1f, float pitchJitter = 0.0f)
 		{
 			if (!clip) return;
 
 			float dist = Vector3.Distance(_localPlayer.GetPosition(), pos);
-			
-			if (dist > maxAudibleDist) 
-				return; //No Audio when too far away
 
-			if (Time.time - _timeLastAudioSourcePlayed < minIntervalPerShooter)
+			if (dist > MaxAudibleDist)
+			{
+				PvPUtils.Log($"[PlayAudio] No audio played, {dist} > {MaxAudibleDist}");
+				return; //No Audio when too far away
+			}
+
+			if (Time.time - _timeLastAudioSourcePlayed < MinIntervalPerShooter)
+			{
+				PvPUtils.Log($"[PlayAudio] No audio played to prevent spam, {Time.time - _timeLastAudioSourcePlayed} < {MinIntervalPerShooter}");
 				return; //prevents audio spam
+			}
 
 			// if at max audio sources, try stealing the worst one
+			AudioSource src;
 			if (_activeAudioSources.Count >= PoolSize)
 			{
+				PvPUtils.Log($"[PlayAudio] No audio source available");
 				float worstScore = FindWorstActiveScore();
 
 				// disable audio source
 				AudioSource worstAudioSource = (AudioSource) _activeAudioSources[worstScore].Reference;
 				worstAudioSource.Stop();
 				_activeAudioSources.Remove(worstScore);
+				src = worstAudioSource;
 			}
-
-			AudioSource src = NextSource();
+			else
+			{
+				src = NextSource();
+			}
 
 			if (src != null)
 			{
 				src.transform.position = pos;
 				src.clip = clip;
 				src.volume = volume;
-				src.pitch = 1f + Random.Range(-pitchJitter, pitchJitter);
+				src.pitch = 1f + pitchJitter;
 				src.Play();
 				_timeLastAudioSourcePlayed = Time.time;
 				_activeAudioSources[GetScore(dist, importance)] = src;
@@ -141,14 +150,14 @@ namespace myrop.pvp
 		/// </summary>
 		/// <param name="score"></param>
 		/// <returns></returns>
-		private float GetScore(float dist, ShotImportance importance)
+		private float GetScore(float dist, int importance)
 		{
 			/* Smaller score = higher priority
 			 * I was thinking that:
 			 * - More recent audio sources should be prioritized, so I substract Time.time
 			 * - Further away audio sources should not be prioritized
 			 * */
-			float score = (float)System.Convert.ToInt32(importance) * dist - (Time.time / 2.0f);
+			float score = importance * dist - (Time.time / 2.0f);
 
 			if (_activeAudioSources.ContainsKey(score))
 			{
@@ -173,7 +182,7 @@ namespace myrop.pvp
 		}
 
 		/// <summary>
-		/// Returns the next available Audio Source
+		/// Returns the next available Audio Source, basically an audio source that isn't playing
 		/// Returns null if there's none available
 		/// </summary>
 		/// <returns></returns>

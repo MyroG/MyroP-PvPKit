@@ -2,6 +2,7 @@
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.Components;
+using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon;
 using VRC.Udon.Common.Interfaces;
@@ -25,14 +26,26 @@ namespace myrop.pvp
 	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class GunBase : UdonSharpBehaviour
 	{
+		[Header("References")]
+		public GunNetworked GunNetworkedReference;
 		public VRCPickup PickupReference;		
-		public EGunMode GunMode;
+		public Transform Barrel;
+		public UIGunAmmo AmmoDisplay;
+		public HitMarkerManager HitMarkerManager;
 
+		[Header("Gun settings")]
+		public EGunMode GunMode;
 		[Range(0, 20)]
 		public int FireRatePerSecond;
 		public float MaxRange = 1000.0f;
 		public float Damage = 100.0f;
+		[Header("Ammo (-1 means infinity)")]
+		public int MaxAmmoInMag = -1;
+		public int MaxReserveAmmo = -1;
+		[Range(0, 10)]
+		public float ReloadTime = 2.0f;
 
+		[Header("Accuracy")]
 		[SerializeField]
 		[Range(0, 45)]
 		private float _minSpreadDeg = 0.0f;
@@ -56,15 +69,25 @@ namespace myrop.pvp
 
 		public ECrosshair Crosshair = ECrosshair.DesktopVR;
 
-		public Transform Barrel;
+		
 
 		[Header("Audio")]
 		public AudioManager LocalAudioManager;
+		public AudioManager RemoteAudioManager;
 		public AudioClip ShotClose;
 		public AudioClip ShotFar;
 		public AudioClip PlayerHit;
+		public AudioClip Reload;
+		public float VolumeLocalShooting = 0.7f;
+		public float VolumeLocalHit = 1;
+		public float VolumeRemoteShooting = 1;
+
+		[Header("Defines where the ammo UI should be placed")]
+		public Transform PathStart;
+		public Transform PathEnd;
 
 		private bool _isTriggerPressed;
+		private bool _isReloading;
 		private bool _isWaitingForNextBullet; //After a bullet was shot, we need to wait until the next bullet can be shot
 
 		public const int HIT_LAYER_MASK = 1 << 0; //Default
@@ -84,9 +107,23 @@ namespace myrop.pvp
 				PickupReference.ExactGun = null;
 			}
 		}
+
+		public void ResetAmmo()
+		{
+			GunNetworkedReference.CurrentAmmo = MaxAmmoInMag;
+			GunNetworkedReference.ReserveAmmo = MaxReserveAmmo;
+		}
+
 		public override void OnPickup()
 		{
 			_isTriggerPressed = false;
+
+			if (AmmoDisplay != null)
+			{
+				AmmoDisplay.gameObject.SetActive(true);
+				AmmoDisplay.AttachToGun(this);
+				GunNetworkedReference.RefreshUI();
+			}
 
 			if (!_isLooping)
 			{
@@ -108,6 +145,11 @@ namespace myrop.pvp
 		public override void OnDrop()
 		{
 			_isTriggerPressed = false;
+
+			if (AmmoDisplay != null)
+			{
+				AmmoDisplay.gameObject.SetActive(false);
+			}
 		}
 
 		public override void OnPickupUseDown()
@@ -153,6 +195,19 @@ namespace myrop.pvp
 			}
 		}
 
+		public void _FinishedReloading()
+		{
+			_isReloading = false;
+
+			int ammoMissing = MaxAmmoInMag - GunNetworkedReference.CurrentAmmo;
+			int ammoToLoad = Mathf.Min(ammoMissing, GunNetworkedReference.ReserveAmmo < 0 ? ammoMissing : GunNetworkedReference.ReserveAmmo);
+
+			GunNetworkedReference.CurrentAmmo += ammoToLoad;
+
+			if (GunNetworkedReference.ReserveAmmo >= 0)
+				GunNetworkedReference.ReserveAmmo -= ammoToLoad;
+		}
+
 		/// <summary>
 		/// Attempting to shoot, the shot is taken if a bullet is chambered or the gun is not reloading
 		/// </summary>
@@ -163,13 +218,23 @@ namespace myrop.pvp
 			if (_isWaitingForNextBullet) //The next bullet isn't chambered yet, we need to wait a bit
 				return;
 
+			if (GunNetworkedReference.CurrentAmmo == 0 ||  _isReloading)  //We don't shoot if no ammo or reloading
+				return;
+
 			_isWaitingForNextBullet = true;
 
 			_Shoot();
 			_currentRecoveryCoefficient = 0.0f;
 			float nextShotTime = _lastShotTime + 1.0f / FireRatePerSecond;
+
 			SendCustomEventDelayedSeconds(nameof(_ChamberNextBullet), nextShotTime - Time.time);
+
 			_lastShotTime = nextShotTime;
+
+			if (GunNetworkedReference.CurrentAmmo > 0)
+			{
+				GunNetworkedReference.CurrentAmmo--;
+			}
 		}
 
 		private Vector3 GetSpreadDirection(Transform barrel, float angleDeg)
@@ -214,9 +279,11 @@ namespace myrop.pvp
 					float damage = Damage * hitDetector.DamageMultiplicator;
 					hitDetector.PlayerHandler.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PlayerHandlerBase.ReceiveDamage), damage, Networking.LocalPlayer.playerId);
 
-					//hit
-					//We slightly delay the event to ensure it doesn't play at the same time as the gunshot, it would sound weird
+					//hit, we slightly delay the event to ensure it doesn't play at the same time as the gunshot, it would sound weird
 					SendCustomEventDelayedSeconds(nameof(_LocalPlayerHitEnemy), 0.05f);
+
+					if (HitMarkerManager != null)
+						HitMarkerManager.Play(hit.point);
 				}
 				else
 				{
@@ -229,15 +296,18 @@ namespace myrop.pvp
 			_currentAngleSpread = Mathf.Clamp(_currentAngleSpread, _minSpreadDeg, _maxSpreadDeg);
 
 			//audio
-			LocalAudioManager.PlayAudio(ShotClose, transform.position, ShotImportance.LocalPlayer, 0.7f);
+			LocalAudioManager.PlayAudio(ShotClose, transform.position, 2, VolumeLocalHit);
+
+			if (GunNetworkedReference != null)
+				GunNetworkedReference._QueueRemotePlayerShotEvent();
 		}
 
 		public void _LocalPlayerHitEnemy()
 		{
-
-			LocalAudioManager.PlayAudio(PlayerHit, transform.position, ShotImportance.LocalPlayer);
-
+			LocalAudioManager.PlayAudio(PlayerHit, transform.position, 0, VolumeLocalHit);
 		}
+
+		
 
 
 		public void _CustomLoop()
@@ -263,6 +333,23 @@ namespace myrop.pvp
 			GunMesh.localRotation = Quaternion.Lerp(GunblowbackOrigin.localRotation
 				, GunblowbackMax.localRotation
 				, lerp);
+
+			//reloading
+			if (!_isReloading && !_isTriggerPressed && MaxAmmoInMag > 0)
+			{
+				float dot = Vector3.Dot(transform.forward, Vector3.down);
+
+				bool isPointingDown = dot > 0.8f;
+
+				if (isPointingDown && GunNetworkedReference.CurrentAmmo != MaxAmmoInMag && GunNetworkedReference.ReserveAmmo != 0)
+				{
+					_isReloading = true;
+					SendCustomEventDelayedSeconds(nameof(_FinishedReloading), ReloadTime);
+
+					//audio
+					LocalAudioManager.PlayAudio(Reload, transform.position, 1, VolumeLocalHit);
+				}
+			}
 
 			if (_currentAngleSpread == 0 && !PickupReference.IsHeld)
 			{

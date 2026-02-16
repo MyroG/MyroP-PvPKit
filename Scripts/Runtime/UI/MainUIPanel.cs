@@ -22,7 +22,11 @@ namespace myrop.pvp
 		public GameObject StartButton;
 		public GameObject ResetButton;
 
+		[SerializeField]
+		private TextMeshProUGUI _lockButtonText;
 
+		[SerializeField]
+		private TextMeshProUGUI _ownerText;
 
 		void Start()
 		{
@@ -41,12 +45,20 @@ namespace myrop.pvp
 
 		public void _OnStartClicked()
 		{
+			if (!Networking.IsOwner(PvPGameManagerReference.gameObject) && PvPGameManagerReference.LockedByOwner)
+				return;  //only the owner can start the game if the panel is locked
+
 			PvPGameManagerReference.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PvPGameManagerReference.OnStartGameClicked));
 		}
 
 		public void _OnResetClicked()
 		{
-			PvPGameManagerReference.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PvPGameManagerReference.OnResetGameClicked));
+			PvPGameManagerReference.OnResetGameClicked();
+		}
+
+		public void _OnToggleLockClicked()
+		{
+			PvPGameManagerReference._ToggleLocked();
 		}
 
 		private void _RefreshJoinPanel()
@@ -78,11 +90,21 @@ namespace myrop.pvp
 			ResetButton.SetActive(isGameStarted);
 		}
 
+		private void _RefreshLock()
+		{
+			if (_lockButtonText != null)
+				_lockButtonText.text = PvPGameManagerReference.LockedByOwner ? "Locked" : "Unlocked";
+
+			if (_ownerText != null)
+				_ownerText.text = $"Current owner is {Networking.GetOwner(PvPGameManagerReference.gameObject).displayName}";
+		}
+
 
 		public void _RefreshUI()
 		{
 			_RefreshJoinPanel();
 			_RefreshButtons();
+			_RefreshLock();
 		}
 	}
 }

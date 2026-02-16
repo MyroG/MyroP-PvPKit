@@ -3,6 +3,7 @@
 using System;
 using UdonSharp;
 using UnityEngine;
+using VRC.SDK3.Data;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -12,18 +13,12 @@ namespace myrop.pvp
 	[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 	public class PlayerHandlerBase : UdonSharpBehaviour
 	{
-		public bool RescaleColliderWithAvatar = false;
-		public float ColliderHeight = 1.6f;
-
 		public MainUIPanel MainMenuReference;
 		public PvPGameManager PvPGameManagerReference;
 		public GunBase Gun;
-		public PlayerColliderAttacher PlayerColliderAttacherReference;
-
-		public MeshRenderer CapsuleRenderer;
-		public Material ImmunityMaterial;
-		public Material NormalMaterial;
 		public MeshRenderer Healthbar;
+
+		public HitDetector[] Colliders;
 
 		[Header("Audio")]
 		public AudioManager LocalAudioManager;
@@ -42,19 +37,30 @@ namespace myrop.pvp
 		private bool _isImmunity;
 
 		private Scoreboard _scoreboard;
+
+
 		private int _playerID;
 		private bool _isOwner;
+		private VRCPlayerApi _owner;
 
+		/// <summary>
+		/// The time it takes someone is immune
+		/// </summary>
 		private const float IMMUNITY_TIME = 3.0f;
 
 		
 
 		private void Start()
 		{
+			_owner = Networking.GetOwner(gameObject);
 			_isOwner = Networking.IsOwner(gameObject);
-			_playerID = Networking.GetOwner(gameObject).playerId;
-			Gun.gameObject.SetActive(false);
-			PlayerColliderAttacherReference.gameObject.SetActive(false);
+			_playerID = _owner.playerId;
+			
+			if (Gun != null)
+				Gun.gameObject.SetActive(false);
+
+			Healthbar.gameObject.SetActive(false);
+			SetColliderEnabledState(false);
 		}
 
 		private Scoreboard GetScoreboard()
@@ -68,19 +74,23 @@ namespace myrop.pvp
 
 		public void _StartGame()
 		{
-			PlayerColliderAttacherReference.gameObject.SetActive(true);
-			CapsuleRenderer.gameObject.SetActive(PvPGameManagerReference.ShowPlayerCapsule && !_isOwner);
+			SetColliderEnabledState(true);
 			
 			if (Gun != null)
 				Gun.gameObject.SetActive(true);
-			
+
+			Healthbar.gameObject.SetActive(true);
+
 			if (!_isOwner)
 				return;
 
 			ResetHealth();
-			_deathCounter = 0;
+			ResetScore();
 			
 			_PlaceGun();
+
+			if (Gun != null)
+				Gun.ResetAmmo();
 			TriggerCooldown();
 			RequestSerialization();
 			OnDeserialization();
@@ -114,19 +124,25 @@ namespace myrop.pvp
 			if (Gun.PickupReference.IsHeld)
 				return;
 
-			Transform player = PlayerColliderAttacherReference.transform;
-			
-			Gun.transform.position = player.position + player.forward + player.up * ColliderHeight / 2.0f;
-			Gun.transform.rotation = player.rotation;
+			Vector3 position = _owner.GetPosition();
+			Quaternion rotation = _owner.GetTrackingData(VRCPlayerApi.TrackingDataType.AvatarRoot).rotation;
+
+			Vector3 forward = rotation * Vector3.forward;
+			Vector3 up = rotation * Vector3.up;
+
+			Gun.transform.position = position + forward + up * (_owner.GetAvatarEyeHeightAsMeters() * 0.7f);
+			Gun.transform.rotation = rotation;
 		}
 
 		public void _FinishGame()
 		{
-			PlayerColliderAttacherReference.gameObject.SetActive(false);
+			SetColliderEnabledState(false);
+			Healthbar.gameObject.SetActive(false);
 
 			if (Gun == null) return;
 
 			Gun.gameObject.SetActive(false);
+			
 			Gun._Drop();
 		}
 
@@ -134,6 +150,13 @@ namespace myrop.pvp
 		{
 			_health = 100.0f;
 		}
+
+		private void ResetScore()
+		{
+			_killCounter = 0;
+			_deathCounter = 0;
+		}
+
 
 		[NetworkCallable]
 		public void ReceiveDamage(float damageReceived, int fromPlayerID)
@@ -163,7 +186,7 @@ namespace myrop.pvp
 			}
 
 			//audio
-			LocalAudioManager.PlayAudio(LocalPlayerGotHit, transform.position, ShotImportance.LocalPlayer, 0.7f);
+			LocalAudioManager.PlayAudio(LocalPlayerGotHit, transform.position, 1, 0.7f);
 
 			RequestSerialization();
 			OnDeserialization();
@@ -174,9 +197,29 @@ namespace myrop.pvp
 			if (_isImmunity)
 				return;
 
+			PvPUtils.Log($"Cooldown triggered");
+
 			_isImmunity = true;
 
 			SendCustomEventDelayedSeconds(nameof(_DisableCooldown), IMMUNITY_TIME);
+
+			//During the cooldown, we also do not want to deal damage to any other player
+			DataDictionary allPlayerObject = PvPGameManagerReference.GetAllPlayerObjects();
+			if (allPlayerObject != null)
+			{
+				DataList keys = allPlayerObject.GetKeys();
+				for(int i = 0;i < keys.Count; i++)
+				{
+					PlayerHandlerBase otherPlayer = (PlayerHandlerBase) allPlayerObject[keys[i]].Reference;
+					if (otherPlayer != null)
+					{
+						foreach(HitDetector hitDetector in otherPlayer.Colliders)
+						{
+							hitDetector.EnableSpawnDamageCooldown(IMMUNITY_TIME);
+						}
+					}
+				}
+			}
 
 			RequestSerialization();
 			OnDeserialization();
@@ -185,6 +228,8 @@ namespace myrop.pvp
 		public void _DisableCooldown()
 		{
 			_isImmunity = false;
+
+			PvPUtils.Log($"Cooldown end, player is not immune anymore");
 
 			RequestSerialization();
 			OnDeserialization();
@@ -196,6 +241,9 @@ namespace myrop.pvp
 			_PlaceGun();
 			ResetHealth();
 			TriggerCooldown();
+
+			if (Gun != null)
+				Gun.ResetAmmo();
 		}
 
 		/// <summary>
@@ -225,11 +273,46 @@ namespace myrop.pvp
 			Scoreboard scoreboard = GetScoreboard();
 			if (scoreboard == null)
 				return;
-			scoreboard.UpdateInScoreboard(_playerID, _killCounter, _deathCounter, _killCounter - (short)(_deathCounter / 2.0f));
+			scoreboard.UpdateInScoreboard(_playerID, _killCounter, _deathCounter, _killCounter * 2 - _deathCounter );
 
-			CapsuleRenderer.material = _isImmunity ? ImmunityMaterial : NormalMaterial;
+			ApplyColliderMaterials();
 
 			Healthbar.material.SetFloat("_Health", _health / 100.0f);
+		}
+
+		private void ApplyColliderMaterials()
+		{
+			if (Colliders == null)
+				return;
+
+			for (int i = 0; i < Colliders.Length; i++)
+			{
+				HitDetector hitDetector = Colliders[i];
+				if (hitDetector == null) 
+					continue;
+
+				hitDetector.SetSpawnInvulnerability(_isImmunity);
+			}
+		}
+
+		private void SetColliderEnabledState(bool isEnabled)
+		{
+			if (_isOwner)
+				isEnabled = false; //We do not want to show the colliders for the local player
+
+			for (int i = 0; i < Colliders.Length; i++)
+			{
+				HitDetector hitDetector = Colliders[i];
+				if (hitDetector == null)
+					continue;
+
+				hitDetector.gameObject.SetActive(isEnabled);
+			}
+		}
+
+		public override void PostLateUpdate()
+		{
+			Healthbar.transform.position = _owner.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position + Vector3.up * 0.65f;
 		}
 	}
 }
