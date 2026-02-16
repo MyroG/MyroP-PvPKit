@@ -1482,7 +1482,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: Lorem ipsum dolor sit amet prefab not released yet
+  m_Text: https://github.com/MyroG/PvP-System
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 1
@@ -6954,7 +6954,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Lorem ipsum dolor sit amet prefab not released yet
+  m_Text: https://github.com/MyroG/PvP-System
 --- !u!222 &1536010762
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -11484,6 +11484,31 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4324159264735925658, guid: 42ad637a500311c479bf08e1a3a198b9,
+        type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4324159264735925658, guid: 42ad637a500311c479bf08e1a3a198b9,
+        type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4324159264735925658, guid: 42ad637a500311c479bf08e1a3a198b9,
+        type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4324159264735925658, guid: 42ad637a500311c479bf08e1a3a198b9,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4324159264735925658, guid: 42ad637a500311c479bf08e1a3a198b9,
+        type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4325212724982421252, guid: 42ad637a500311c479bf08e1a3a198b9,
         type: 3}
       propertyPath: m_AnchorMax.y
@@ -12159,6 +12184,11 @@ PrefabInstance:
     - target: {fileID: 5466330057881755216, guid: 42ad637a500311c479bf08e1a3a198b9,
         type: 3}
       propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5466330057881755216, guid: 42ad637a500311c479bf08e1a3a198b9,
+        type: 3}
+      propertyPath: m_LocalPosition.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5466330057881755216, guid: 42ad637a500311c479bf08e1a3a198b9,
@@ -13901,7 +13931,7 @@ PrefabInstance:
     - target: {fileID: 8518262281564202493, guid: 42ad637a500311c479bf08e1a3a198b9,
         type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8523300115756264444, guid: 42ad637a500311c479bf08e1a3a198b9,
         type: 3}
