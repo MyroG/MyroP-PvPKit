@@ -23,9 +23,11 @@ Aim down to reload the weapon.
 - Select the `PvP System` prefab, navigate to the `PvP Game manager` component, and drag&drop the spawn points you created in the previous step into the `Spawn Points` fields
 - See "Settings" to see how you can customize the prefab
 
-If you want to test the Demo scene, you need to install the "Lit" shader package by z3y https://github.com/z3y/shaders
+> [!INFO]
+> If you want to test the Demo scene, you need to install the "Lit" shader package by z3y https://github.com/z3y/shaders
 
-By default, VRChat's player synchronisation is slow, you may experience the issue where you get killed by a player that hasn't appeared on the screen yet. The player syncing speed can be improved with additional packages, like Ikeiwa's BetterPlayerSync package https://github.com/Ikeiwa/BetterPlayerSync
+> [!TIP]
+> By default, VRChat's player synchronisation is slow, you may experience the issue where you get killed by a player that hasn't appeared on the screen yet. The player syncing speed can be improved with additional packages, like Ikeiwa's BetterPlayerSync package https://github.com/Ikeiwa/BetterPlayerSync
 
 ## Settings
 
