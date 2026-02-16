@@ -29,6 +29,11 @@ namespace myrop.pvp
 		[UdonSynced] 
 		public bool LockedByOwner = true;
 
+		/// <summary>
+		/// Time someone is immune
+		/// </summary>
+		public float ImmunityTime = 3.0f;
+
 		[UdonSynced]
 		private double _startNetworkingTime;
 

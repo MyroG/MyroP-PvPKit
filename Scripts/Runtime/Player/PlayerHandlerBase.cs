@@ -43,11 +43,6 @@ namespace myrop.pvp
 		private bool _isOwner;
 		private VRCPlayerApi _owner;
 
-		/// <summary>
-		/// The time it takes someone is immune
-		/// </summary>
-		private const float IMMUNITY_TIME = 3.0f;
-
 		
 
 		private void Start()
@@ -91,7 +86,10 @@ namespace myrop.pvp
 
 			if (Gun != null)
 				Gun.ResetAmmo();
-			TriggerCooldown();
+
+			if (PvPGameManagerReference.ImmunityTime > 0)
+				TriggerCooldown();
+
 			RequestSerialization();
 			OnDeserialization();
 		}
@@ -201,7 +199,7 @@ namespace myrop.pvp
 
 			_isImmunity = true;
 
-			SendCustomEventDelayedSeconds(nameof(_DisableCooldown), IMMUNITY_TIME);
+			SendCustomEventDelayedSeconds(nameof(_DisableCooldown), PvPGameManagerReference.ImmunityTime);
 
 			//During the cooldown, we also do not want to deal damage to any other player
 			DataDictionary allPlayerObject = PvPGameManagerReference.GetAllPlayerObjects();
@@ -215,7 +213,7 @@ namespace myrop.pvp
 					{
 						foreach(HitDetector hitDetector in otherPlayer.Colliders)
 						{
-							hitDetector.EnableSpawnDamageCooldown(IMMUNITY_TIME);
+							hitDetector.EnableSpawnDamageCooldown(PvPGameManagerReference.ImmunityTime);
 						}
 					}
 				}
@@ -240,7 +238,9 @@ namespace myrop.pvp
 			PvPGameManagerReference._TeleportLocalPlayerToRandom();
 			_PlaceGun();
 			ResetHealth();
-			TriggerCooldown();
+
+			if (PvPGameManagerReference.ImmunityTime > 0)
+				TriggerCooldown();
 
 			if (Gun != null)
 				Gun.ResetAmmo();
