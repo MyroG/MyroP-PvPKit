@@ -29,7 +29,8 @@ Aim down to reload the weapon.
 
 > [!TIP]
 > By default, VRChat's player synchronisation is slow, you may experience the issue where you get killed by a player that hasn't appeared on the screen yet. The player syncing speed can be improved with additional packages, like Ikeiwa's BetterPlayerSync package https://github.com/Ikeiwa/BetterPlayerSync
-> If you also need synced footstep sound effects, you can also install Vowgan's "Collision and Footstep Sounds" prefab https://booth.pm/ja/items/1966582
+> 
+> If you also need synced footstep sound effects, you can install Vowgan's "Collision and Footstep Sounds" prefab https://booth.pm/ja/items/1966582
 
 > [!WARNING]
 > Do not disable the whole prefab in the world (using an in-world setting or a toggle). If the owner of that prefab disables it, the prefab won't work anymore. This is an issue I'll try to fix later.
@@ -37,6 +38,8 @@ Aim down to reload the weapon.
 ## Settings
 
 The prefab can be customized by playing around with some settings, they are scattered around through sereval GameObjects which I'll list below (you can search for them in the hierarchy):
+
+![Tree](https://github.com/MyroG/MyroP-PvPKit/blob/master/_DocImages/Tree.png)
 
 ### PvP System
 
@@ -55,7 +58,7 @@ The prefab can be customized by playing around with some settings, they are scat
 - **Colliders**: List of colliders attached to each player
 - **Local Player Got Hit**: Audio clip that needs to be played if the local player got hit
 
-### Gun
+### PvP Gun
 
 - **Max Ammo In Mag**: Number of bullets per magazine.
 - **Max Reserve Ammo**: Extra ammo outside the current magazine, so the ammo you're carying. If set to `-1`, the player has infinite reserve ammo. Currently, there's no way to pick up ammo!
@@ -140,7 +143,10 @@ Keep in mind that having multiple colliders impact performance, so if you want t
 - Gun models : https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack
 - Audio : https://happysoulmusic.com/fire-weapons-sound-effects/
 
+If you decide to add me to the credits, please use my VRChat username "MyroP". You can also include a link to this repository, for example: "PvPKit by MyroP – https://github.com/MyroG/MyroP-PvPKit/"
+
 ## License 
+
 See the license file in each folder for details.
 
 Unless stated otherwise, the code is licensed under the MIT License.  
