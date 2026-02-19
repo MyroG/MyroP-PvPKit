@@ -117,6 +117,8 @@ Forces each player to have a certain scale in-game, even after switching avatars
 
 ## Customize Gun
 
+![Tree](https://github.com/MyroG/MyroP-PvPKit/blob/master/_DocImages/Gun.png)
+
 - The easiest way would be to duplicate an existing Gun prefab (like the grease gun or AK47)
 - Place the new gun mesh as a child of the `GunRoot` mesh, and position it so the grips of both guns match. Then delete the old gun mesh.
 - Move the `Barrel` GameObject in front of the barrel.
