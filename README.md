@@ -147,6 +147,7 @@ Keep in mind that having multiple colliders impact performance, so if you want t
 
 If you decide to add me to the credits, please use my VRChat username "MyroP". You can also include a link to this repository, for example: "PvPKit by MyroP – https://github.com/MyroG/MyroP-PvPKit/"
 
+For questions, you can also ask me on Discord (@myrop), you can find all my contact informations here t.co/FjcwqSIewV
 ## License 
 
 See the license file in each folder for details.
