@@ -36,7 +36,7 @@ namespace myrop.pvp
 			}
 		}
 
-		private void Update()
+		public override void PostLateUpdate()
 		{
 			if (_localPlayerHandler == null)
 			{
@@ -54,7 +54,7 @@ namespace myrop.pvp
 
 			float crosshairDistanceFromPlayer = 0.0f;
 			//Rendering the crosshair in the scene
-			if (Physics.Raycast(gun.Barrel.position, gun.Barrel.forward, out RaycastHit hit, MaxRenderDistanceCrosshair, GunBase.HIT_LAYER_MASK))
+			if (Physics.Raycast(gun.GetRaycastStart(), gun.GetRaycastDirection(), out RaycastHit hit, MaxRenderDistanceCrosshair, GunBase.HIT_LAYER_MASK))
 			{
 				CrosshairObject.transform.position = hit.point;
 				crosshairDistanceFromPlayer = hit.distance;

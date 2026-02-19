@@ -11,7 +11,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace myrop.pvp
 {
-	[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class MainUIPanel : UdonSharpBehaviour
 	{
 		public PvPGameManager PvPGameManagerReference;
@@ -60,6 +60,20 @@ namespace myrop.pvp
 		{
 			PvPGameManagerReference._ToggleLocked();
 		}
+
+		/*public void _OnOwnerClicked()
+		{
+			if (PvPGameManagerReference.LockedByOwner)
+				return;
+
+			Networking.SetOwner(Networking.LocalPlayer, PvPGameManagerReference.gameObject);
+
+			Scoreboard scoreboard = PvPGameManagerReference.GetScoreboardInstance();
+			if (scoreboard != null)
+			{
+				Networking.SetOwner(Networking.LocalPlayer, scoreboard.gameObject);
+			}
+		}*/
 
 		private void _RefreshJoinPanel()
 		{

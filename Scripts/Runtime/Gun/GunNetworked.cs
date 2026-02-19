@@ -43,7 +43,7 @@ namespace myrop.pvp
 
 		public void _QueueRemotePlayerShotEvent()
 		{
-			if (NetworkCalling.GetQueuedEvents((IUdonEventReceiver)this, nameof(RemotePlayerShot)) == 0)
+			if (NetworkCalling.GetQueuedEvents((IUdonEventReceiver)this, nameof(RemotePlayerShot)) == 0) //To prevent events getting queued
 				SendCustomNetworkEvent(NetworkEventTarget.Others, nameof(RemotePlayerShot));
 		}
 
@@ -54,6 +54,10 @@ namespace myrop.pvp
 			Random.InitState(id);
 			float dist = Vector3.Distance(Networking.LocalPlayer.GetPosition(), transform.position);
 			Gun.RemoteAudioManager.PlayAudio(dist < Gun.RemoteAudioManager.MidDist ? Gun.ShotClose : Gun.ShotFar, transform.position, 5, Gun.VolumeRemoteShooting, Random.Range(-0.2f, 0.2f));
+
+			//muzzle flash
+			Gun.MuzzleFlash.Stop();
+			Gun.MuzzleFlash.Play();
 		}
 
 		public void RefreshUI()

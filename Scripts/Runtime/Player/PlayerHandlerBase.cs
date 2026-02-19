@@ -42,15 +42,16 @@ namespace myrop.pvp
 		private int _playerID;
 		private bool _isOwner;
 		private VRCPlayerApi _owner;
+		private MaterialPropertyBlock _mpbHealthbar;
 
-		
 
 		private void Start()
 		{
 			_owner = Networking.GetOwner(gameObject);
 			_isOwner = Networking.IsOwner(gameObject);
 			_playerID = _owner.playerId;
-			
+			_mpbHealthbar = new MaterialPropertyBlock();
+
 			if (Gun != null)
 				Gun.gameObject.SetActive(false);
 
@@ -277,7 +278,13 @@ namespace myrop.pvp
 
 			ApplyColliderMaterials();
 
-			Healthbar.material.SetFloat("_Health", _health / 100.0f);
+			//Update the healthbar
+			if (Healthbar != null)
+			{
+				Healthbar.GetPropertyBlock(_mpbHealthbar);
+				_mpbHealthbar.SetFloat("_Health", _health / 100.0f);
+				Healthbar.SetPropertyBlock(_mpbHealthbar);
+			}
 		}
 
 		private void ApplyColliderMaterials()

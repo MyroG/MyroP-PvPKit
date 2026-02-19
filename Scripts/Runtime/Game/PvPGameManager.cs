@@ -26,6 +26,8 @@ namespace myrop.pvp
 
 		public bool ShowPlayerCapsule = true;
 
+		public bool DesktopAimWithHead = false;
+
 		[UdonSynced] 
 		public bool LockedByOwner = true;
 

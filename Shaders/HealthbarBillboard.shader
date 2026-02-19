@@ -1,3 +1,5 @@
+// Upgrade NOTE: upgraded instancing buffer 'MyroPHealthbarBillboard' to new syntax.
+
 // Made with Amplify Shader Editor v1.9.8.1
 // Available at the Unity Asset Store - http://u3d.as/y3X 
 Shader "MyroP/HealthbarBillboard"
@@ -22,6 +24,7 @@ Shader "MyroP/HealthbarBillboard"
 		CGPROGRAM
 		#include "UnityPBSLighting.cginc"
 		#pragma target 3.5
+		#pragma multi_compile_instancing
 		#define ASE_VERSION 19801
 		#pragma surface surf StandardCustomLighting keepalpha addshadow fullforwardshadows vertex:vertexDataFunc 
 		struct Input
@@ -44,11 +47,15 @@ Shader "MyroP/HealthbarBillboard"
 
 		uniform float4 _LowHealthColor;
 		uniform float4 _FullHealthColor;
-		uniform float _Health;
 		uniform float4 _BackgroundColor;
 		uniform float4 _BorderColor;
 		uniform float _BorderX;
 		uniform float _BorderY;
+
+		UNITY_INSTANCING_BUFFER_START(MyroPHealthbarBillboard)
+			UNITY_DEFINE_INSTANCED_PROP(float, _Health)
+#define _Health_arr MyroPHealthbarBillboard
+		UNITY_INSTANCING_BUFFER_END(MyroPHealthbarBillboard)
 
 		void vertexDataFunc( inout appdata_full v, out Input o )
 		{
@@ -85,12 +92,13 @@ Shader "MyroP/HealthbarBillboard"
 		void surf( Input i , inout SurfaceOutputCustomLightingCustom o )
 		{
 			o.SurfInput = i;
-			float3 lerpResult28 = lerp( _LowHealthColor.rgb , _FullHealthColor.rgb , _Health);
+			float _Health_Instance = UNITY_ACCESS_INSTANCED_PROP(_Health_arr, _Health);
+			float3 lerpResult28 = lerp( _LowHealthColor.rgb , _FullHealthColor.rgb , _Health_Instance);
 			float2 appendResult19 = (float2(_BorderX , _BorderY));
 			float2 break22 = floor( ( abs( ( i.uv_texcoord - float2( 0.5,0.5 ) ) ) + float2( 0.5,0.5 ) + appendResult19 ) );
 			float border25 = saturate( ( break22.x + break22.y ) );
 			float4 lerpResult24 = lerp( _BackgroundColor , _BorderColor , border25);
-			float4 lerpResult38 = lerp( float4( ( lerpResult28 * saturate( floor( ( _Health + 1.0 + -i.uv_texcoord.x ) ) ) ) , 0.0 ) , lerpResult24 , border25);
+			float4 lerpResult38 = lerp( float4( ( lerpResult28 * saturate( floor( ( _Health_Instance + 1.0 + -i.uv_texcoord.x ) ) ) ) , 0.0 ) , lerpResult24 , border25);
 			o.Emission = lerpResult38.rgb;
 		}
 
@@ -114,7 +122,7 @@ Node;AmplifyShaderEditor.BreakToComponentsNode;22;-1136,-800;Inherit;False;FLOAT
 Node;AmplifyShaderEditor.TextureCoordinatesNode;29;-2048,720;Inherit;False;0;-1;2;3;2;SAMPLER2D;;False;0;FLOAT2;1,1;False;1;FLOAT2;0,0;False;5;FLOAT2;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
 Node;AmplifyShaderEditor.SimpleAddOpNode;21;-976,-800;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.NegateNode;36;-1792,752;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
-Node;AmplifyShaderEditor.RangedFloatNode;27;-1936,464;Inherit;False;Property;_Health;Health;6;0;Create;True;0;0;0;False;0;False;0;0;0;1;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;27;-1936,464;Inherit;False;InstancedProperty;_Health;Health;6;0;Create;True;0;0;0;False;0;False;0;0;0;1;0;1;FLOAT;0
 Node;AmplifyShaderEditor.SaturateNode;20;-800,-800;Inherit;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.SimpleAddOpNode;32;-1568,704;Inherit;True;3;3;0;FLOAT;0;False;1;FLOAT;1;False;2;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;25;-624,-800;Inherit;False;border;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
@@ -161,4 +169,4 @@ WireConnection;38;1;24;0
 WireConnection;38;2;39;0
 WireConnection;0;2;38;0
 ASEEND*/
-//CHKSM=FC4691A2FCFD7CB341D73EDA6E7738D21140EC5E
+//CHKSM=37D06771C237AE133D8926C34A58C66DD150878D

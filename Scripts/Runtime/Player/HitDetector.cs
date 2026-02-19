@@ -16,7 +16,6 @@ namespace myrop.pvp
 		public Vector3 Offset;
 		public float ScaleMultiplicator = 1f;
 		public float DamageMultiplicator = 1.0f;
-		public bool VisibleMesh;
 		public Material ImmunityMaterial;
 		public Material NormalMaterial;
 
@@ -32,7 +31,7 @@ namespace myrop.pvp
 		{
 			_defaultScale = transform.localScale;
 			_meshRenderer = GetComponent<MeshRenderer>();
-			if (!VisibleMesh && _meshRenderer != null)
+			if (!PlayerHandler.PvPGameManagerReference.ShowPlayerCapsule && _meshRenderer != null)
 				_meshRenderer.enabled = false;
 			_player = Networking.GetOwner(PlayerHandler.gameObject);
 		}
@@ -68,10 +67,15 @@ namespace myrop.pvp
 			_SetImmunityMaterial();
 		}
 
+		public bool IsInvulnerable()
+		{
+			return _isSpawnInvulnerable || _isSpawnDamageDisabled;
+		}
+
 		public void _SetImmunityMaterial()
 		{
-			bool isImmune = _isSpawnInvulnerable && _isSpawnDamageDisabled;
-			if (_meshRenderer != null && VisibleMesh)
+			bool isImmune = _isSpawnInvulnerable || _isSpawnDamageDisabled;
+			if (_meshRenderer != null)
 			{
 				_meshRenderer.material = isImmune ? ImmunityMaterial : NormalMaterial;
 			}

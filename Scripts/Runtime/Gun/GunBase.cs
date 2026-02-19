@@ -27,11 +27,13 @@ namespace myrop.pvp
 	public class GunBase : UdonSharpBehaviour
 	{
 		[Header("References")]
+		public PvPGameManager GameManager;
 		public GunNetworked GunNetworkedReference;
 		public VRCPickup PickupReference;		
 		public Transform Barrel;
 		public UIGunAmmo AmmoDisplay;
 		public HitMarkerManager HitMarkerManager;
+		public ParticleSystem MuzzleFlash;
 
 		[Header("Gun settings")]
 		public EGunMode GunMode;
@@ -66,6 +68,7 @@ namespace myrop.pvp
 		public Transform GunMesh;
 		public Transform GunblowbackOrigin;
 		public Transform GunblowbackMax;
+		private Vector3 _defaultGunPosition;
 
 		public ECrosshair Crosshair = ECrosshair.DesktopVR;
 
@@ -95,17 +98,25 @@ namespace myrop.pvp
 		private bool _isLooping = false;
 
 		private float _lastShotTime;
+		private Smoothing _smoothingModule;
 
 		public ImpactDebug ImpactDebugReference;
 
 		private void Start()
 		{
+			_defaultGunPosition = GunMesh.transform.localPosition;
 			if (Networking.LocalPlayer.IsUserInVR())
 			{
 				PickupReference.orientation = VRC_Pickup.PickupOrientation.Any;
 				PickupReference.ExactGrip = null;
 				PickupReference.ExactGun = null;
 			}
+		}
+
+
+		public void RegisterSmoothingModule(Smoothing smoothing)
+		{
+			_smoothingModule = smoothing;
 		}
 
 		public void ResetAmmo()
@@ -130,6 +141,12 @@ namespace myrop.pvp
 				_isLooping = true;
 				_CustomLoop();
 			}
+			
+			if (_smoothingModule != null)
+			{
+				//We only enable smoothing in VR, so Desktop players can flickshot more easily 
+				_smoothingModule.enabled = Networking.LocalPlayer.IsUserInVR();
+			}
 		}
 
 		public void SetMinSpreadDeg(float deg)
@@ -149,6 +166,11 @@ namespace myrop.pvp
 			if (AmmoDisplay != null)
 			{
 				AmmoDisplay.gameObject.SetActive(false);
+			}
+
+			if (_smoothingModule != null)
+			{
+				_smoothingModule.enabled = false;
 			}
 		}
 
@@ -237,13 +259,17 @@ namespace myrop.pvp
 			}
 		}
 
-		private Vector3 GetSpreadDirection(Transform barrel, float angleDeg)
+		private Vector3 GetSpreadDirection(Quaternion barrelRot, float angleDeg)
 		{
 			Vector2 random = Random.insideUnitCircle * Mathf.Tan(angleDeg * 0.5f * Mathf.Deg2Rad);
 
-			Vector3 dir = barrel.forward
-						 + barrel.right * random.x
-						 + barrel.up * random.y;
+			Vector3 forward = barrelRot * Vector3.forward;
+			Vector3 right = barrelRot * Vector3.right;
+			Vector3 up = barrelRot * Vector3.up;
+
+			Vector3 dir = forward
+						+ right * random.x
+						+ up * random.y;
 
 			return dir.normalized;
 		}
@@ -252,7 +278,7 @@ namespace myrop.pvp
 		{
 			PvPUtils.Log($"_Shoot : Local player shoots, _currentAngleSpread={_currentAngleSpread}");
 
-			if (Physics.Raycast(Barrel.position, GetSpreadDirection(Barrel, _currentAngleSpread), out RaycastHit hit, MaxRange, HIT_LAYER_MASK))
+			if (Physics.Raycast(GetRaycastStart(), GetSpreadDirection(GetRaycastRotation(), _currentAngleSpread), out RaycastHit hit, MaxRange, HIT_LAYER_MASK))
 			{
 				if (hit.collider == null || hit.collider.gameObject == null)
 				{
@@ -272,18 +298,21 @@ namespace myrop.pvp
 				{
 					PvPUtils.Log($"_Shoot : Local player hit a player");
 
-					VRCPlayerApi otherPlayer = Networking.GetOwner(hitDetector.gameObject);
-					OnShotHit(hit, otherPlayer, hitDetector.DamageMultiplicator);
+					if (!hitDetector.IsInvulnerable())
+					{
+						VRCPlayerApi otherPlayer = Networking.GetOwner(hitDetector.gameObject);
+						OnShotHit(hit, otherPlayer, hitDetector.DamageMultiplicator);
 
-					//damage
-					float damage = Damage * hitDetector.DamageMultiplicator;
-					hitDetector.PlayerHandler.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PlayerHandlerBase.ReceiveDamage), damage, Networking.LocalPlayer.playerId);
+						//damage
+						float damage = Damage * hitDetector.DamageMultiplicator;
+						hitDetector.PlayerHandler.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PlayerHandlerBase.ReceiveDamage), damage, Networking.LocalPlayer.playerId);
 
-					//hit, we slightly delay the event to ensure it doesn't play at the same time as the gunshot, it would sound weird
-					SendCustomEventDelayedSeconds(nameof(_LocalPlayerHitEnemy), 0.05f);
+						//hit, we slightly delay the event to ensure it doesn't play at the same time as the gunshot, it would sound weird
+						SendCustomEventDelayedSeconds(nameof(_LocalPlayerHitEnemy), 0.05f);
 
-					if (HitMarkerManager != null)
-						HitMarkerManager.Play(hit.point);
+						if (HitMarkerManager != null)
+							HitMarkerManager.Play(hit.point);
+					}
 				}
 				else
 				{
@@ -298,6 +327,10 @@ namespace myrop.pvp
 			//audio
 			LocalAudioManager.PlayAudio(ShotClose, transform.position, 2, VolumeLocalHit);
 
+			//muzzleflash
+			MuzzleFlash.Stop();
+			MuzzleFlash.Play();
+
 			if (GunNetworkedReference != null)
 				GunNetworkedReference._QueueRemotePlayerShotEvent();
 		}
@@ -307,7 +340,34 @@ namespace myrop.pvp
 			LocalAudioManager.PlayAudio(PlayerHit, transform.position, 0, VolumeLocalHit);
 		}
 
-		
+		private bool IsAimWithHead()
+		{
+			return GameManager.DesktopAimWithHead && !Networking.LocalPlayer.IsUserInVR();
+		}
+
+		public Vector3 GetRaycastStart()
+		{
+			if (IsAimWithHead())
+				return Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
+			else
+				return Barrel.position;
+		}
+
+		public Quaternion GetRaycastRotation()
+		{
+			if (IsAimWithHead())
+				return Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
+			else
+				return Barrel.rotation;
+		}
+
+		public Vector3 GetRaycastDirection()
+		{
+			if (IsAimWithHead())
+				return Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation * Vector3.forward;
+			else
+				return Barrel.forward;
+		}
 
 
 		public void _CustomLoop()
@@ -326,10 +386,11 @@ namespace myrop.pvp
 			_currentAngleSpread = Mathf.Clamp(_currentAngleSpread, _minSpreadDeg, _maxSpreadDeg);
 
 			//Gun blowback
+			Vector3 offset = GunblowbackOrigin.localPosition - _defaultGunPosition;
 			float lerp = Mathf.InverseLerp(_minSpreadDeg, _maxSpreadDeg, _currentAngleSpread);
 			GunMesh.localPosition = Vector3.Lerp(GunblowbackOrigin.localPosition
 				, GunblowbackMax.localPosition
-				, lerp);
+				, lerp) - offset;
 			GunMesh.localRotation = Quaternion.Lerp(GunblowbackOrigin.localRotation
 				, GunblowbackMax.localRotation
 				, lerp);
@@ -379,7 +440,5 @@ namespace myrop.pvp
 		public virtual void OnShotMissed(RaycastHit hit) { }
 
 		public virtual void OnShotHit(RaycastHit hit, VRCPlayerApi playerHitted, float damageMultiplicator) { }
-
-		
 	}
 }

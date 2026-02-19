@@ -17,6 +17,8 @@ namespace myrop.pvp
 	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class Smoothing : UdonSharpBehaviour
 	{
+		public GunBase Gun;
+
 		[Header("Slow movement smoothing (jitter kill)")]
 		public float SlowPosLerpSpeed = 12f;   // higher = snappier
 		public float SlowRotLerpSpeed = 12f;
@@ -40,9 +42,9 @@ namespace myrop.pvp
 		private Quaternion _prevRawRot;
 
 		private void Start()
-		{ 
-			//We only enable smoothing in VR, so Desktop players can flickshot more easily 
-			enabled = Networking.LocalPlayer.IsUserInVR();
+		{
+			Gun.RegisterSmoothingModule(this);
+			enabled = false;
 		}
 
 		void OnEnable()
